@@ -6,6 +6,7 @@ import drjit as dr
 import numpy as np
 
 mi.set_variant("cuda_ad_rgb")
+import util
 
 bpy.ops.wm.open_mainfile(filepath="untitled.blend")
 
@@ -95,6 +96,8 @@ class BlendBSDF(mi.BSDF):
                 reflectance = self.sample_node_input(
                     node, "Color", ctx, si, sample1, sample2, active
                 )
+                if isinstance(reflectance, list):
+                    reflectance = mi.Color3f(reflectance[:3])
                 normal = self.sample_node_input(
                     node, "Normal", ctx, si, sample1, sample2, active
                 )
@@ -114,7 +117,7 @@ class BlendBSDF(mi.BSDF):
                 bs.sampled_type = mi.BSDFFlags.DiffuseReflection
                 bs.sampled_component = 0
 
-                ret = {node.outputs[0].name: (bs, mi.Color3f(reflectance[:3]))}
+                ret = {node.outputs[0].name: (bs, reflectance)}
             case "EMISSION":
                 color = self.sample_node_input(
                     node, "Color", ctx, si, sample1, sample2, active
@@ -244,7 +247,27 @@ class BlendBSDF(mi.BSDF):
                             f'Interpolation "{node.interpolation}" not supported!'
                         )
 
-                ret = {node.outputs[0].name: color}
+                ret = {node.outputs[0].name: color, node.outputs[1].name: color[3]}
+            case "TEX_WHITE_NOISE":
+                vector = self.sample_node_input(
+                    node, "Vector", ctx, si, sample1, sample2, active
+                )
+                if vector is None:
+                    vector = mi.Point3f(si.uv.x, si.uv.y, 0.0)
+
+                seed = mi.UInt32(vector.x)
+                seed = util.pcg(seed) + mi.UInt32(vector.y)
+                seed = util.pcg(seed) + mi.UInt32(vector.z)
+
+                value = util.uint32_to_uniform_float(seed)
+                seed = util.pcg(seed)
+                color = [util.uint32_to_uniform_float(seed)]
+                seed = util.pcg(seed)
+                color.append(util.uint32_to_uniform_float(seed))
+                seed = util.pcg(seed)
+                color.append(util.uint32_to_uniform_float(seed))
+                color.append(mi.Float32(0.0))
+                ret = {node.outputs[0].name: value, node.outputs[1].name: color}
             case _:
                 raise Exception(f'Node of type "{node.type} is not supported!"')
         return ret
