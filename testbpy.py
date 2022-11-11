@@ -44,7 +44,7 @@ class BlendBSDF(mi.BSDF):
         active: bool = True,
     ) -> Any:
         input = node.inputs[input]
-        print(f"{input.type=}")
+        print(f'Sampling node "{node.name}":')
         links = input.links
         if links is not None and len(links) == 1:
             link = links[0]
@@ -64,6 +64,16 @@ class BlendBSDF(mi.BSDF):
                     value = mi.Color3f(value[0], value[1], value[2])
                     print(f"{value=}")
                     return value
+                case "VECTOR":
+                    match input.name:
+                        case "Normal":
+                            return si.n
+                case "VALUE":
+                    value = mi.Float(value)
+                    print(f"{value=}")
+                    return value
+                case _:
+                    raise Exception(f"Input of type {input.type} is not supported!")
 
     def sample_node(
         self,
@@ -80,7 +90,12 @@ class BlendBSDF(mi.BSDF):
                 reflectance = self.sample_node_input(
                     node, "Color", ctx, si, sample1, sample2, active
                 )
-                cos_theta_i = mi.Frame3f.cos_theta(si.wi)
+                normal = self.sample_node_input(
+                    node, "Normal", ctx, si, sample1, sample2, active
+                )
+                print(f"{type(normal)=}")
+                print(f"{type(reflectance)=}")
+                cos_theta_i = dr.dot(normal, si.wi)
 
                 bs: mi.BSDFSample3f = dr.zeros(mi.BSDFSample3f)
 
@@ -110,6 +125,17 @@ class BlendBSDF(mi.BSDF):
                     node.outputs[0].name: view_vector,
                     node.outputs[2].name: view_distance,
                 }
+            case "FRESNEL":
+                ior = self.sample_node_input(
+                    node, "IOR", ctx, si, sample1, sample2, active
+                )
+                normal = self.sample_node_input(
+                    node, "Normal", ctx, si, sample1, sample2, active
+                )
+                cos_theta_i = dr.dot(normal, si.wi)
+
+                fac = mi.fresnel(cos_theta_i, ior)
+                return {node.outputs[0].name: fac[0]}
 
     def eval(self, ctx, si, wo, active):
         return 0.0
