@@ -156,6 +156,17 @@ class BlendBSDF(mi.BSDF):
                     node.outputs[5].name: parametric,
                     node.outputs[6].name: backfacing,
                 }
+            case "TEX_COORD":
+                generated = si.uv
+                normal = si.n
+                uv = mi.Point3f(si.uv.x, si.uv.y, 0)
+                reflection = mi.reflect(si.wi, si.n)
+                ret = {
+                    node.outputs[0].name: generated,
+                    node.outputs[1].name: normal,
+                    node.outputs[2].name: uv,
+                    node.outputs[6].name: reflection,
+                }
             case _:
                 raise Exception(f'Node of type "{node.type} is not supported!"')
         return ret
@@ -187,7 +198,7 @@ for ob in bpy.data.objects:
 
 scene = mi.cornell_box()
 scene["large-box"]["bsdf"] = bsdfs["Material"]
-print(f"{scene=}")
+# print(f"{scene=}")
 scene = mi.load_dict(scene)
 
 with dr.suspend_grad():
