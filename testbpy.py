@@ -198,13 +198,11 @@ class BlendBSDF(mi.BSDF):
                     node.outputs[6].name: reflection,
                 }
             case "TEX_IMAGE":
-                print(f"{node.image.filepath=}")
                 width, height = node.image.size
                 pixels = np.array(node.image.pixels)
                 # pixels = pixels.reshape((width, height, 4))
                 # bm = mi.Bitmap(np.array(node.image.pixels)[..., :3])
                 tensor = mi.TensorXf(pixels, shape=[height, width, 4])
-                tex = mi.Texture2f(tensor)
 
                 vector = self.sample_node_input(
                     node, "Vector", ctx, si, sample1, sample2, active
@@ -212,7 +210,21 @@ class BlendBSDF(mi.BSDF):
                 if vector is None:
                     vector = mi.Point3f(si.uv.x, si.uv.y, 0.0)
 
-                color = tex.eval(mi.Point2f(vector.x, vector.y), active)
+                match node.interpolation:
+                    case "Linear":
+                        tex = mi.Texture2f(tensor, filter_mode=dr.FilterMode.Linear)
+                        color = tex.eval(mi.Point2f(vector.x, vector.y), active)
+                    case "Closest":
+                        tex = mi.Texture2f(tensor, filter_mode=dr.FilterMode.Nearest)
+                        print(f"{tex.filter_mode()=}")
+                        color = tex.eval_cubic(mi.Point2f(vector.x, vector.y), active)
+                    case "Cubic":
+                        tex = mi.Texture2f(tensor)
+                        color = tex.eval_cubic(mi.Point2f(vector.x, vector.y), active)
+                    case _:
+                        raise Exception(
+                            f'Interpolation "{node.interpolation}" not supported!'
+                        )
 
                 ret = {node.outputs[0].name: color}
             case _:
