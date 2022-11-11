@@ -85,6 +85,7 @@ class BlendBSDF(mi.BSDF):
         active: bool = True,
     ) -> Any:
         print(f"{node.type=}")
+        ret = {}
         match node.type:
             case "BSDF_DIFFUSE":
                 reflectance = self.sample_node_input(
@@ -107,21 +108,21 @@ class BlendBSDF(mi.BSDF):
                 bs.sampled_type = mi.BSDFFlags.DiffuseReflection
                 bs.sampled_component = 0
 
-                return {node.outputs[0].name: (bs, mi.Color3f(reflectance))}
+                ret = {node.outputs[0].name: (bs, mi.Color3f(reflectance))}
             case "VALUE":
                 value = node.outputs[0].default_value
                 value = mi.Float(value)
                 print(f"{value=}")
-                return {node.outputs[0].name: value}
+                ret = {node.outputs[0].name: value}
             case "RGB":
                 value = node.outputs[0].default_value
                 value = mi.Color3f(value[0], value[1], value[2])
                 print(f"{value=}")
-                return {node.outputs[0].name: value}
+                ret = {node.outputs[0].name: value}
             case "CAMERA":
                 view_vector = si.wi
                 view_distance = si.t
-                return {
+                ret = {
                     node.outputs[0].name: view_vector,
                     node.outputs[2].name: view_distance,
                 }
@@ -135,7 +136,15 @@ class BlendBSDF(mi.BSDF):
                 cos_theta_i = dr.dot(normal, si.wi)
 
                 fac = mi.fresnel(cos_theta_i, ior)
-                return {node.outputs[0].name: fac[0]}
+                ret = {node.outputs[0].name: fac[0]}
+            case "NEW_GEOMETRY":
+                position = si.p
+                normal = si.n
+                tangent = si.to_world(mi.Vector3f(1.0, 0.0, 0.0))
+                true_normal = si.n
+            case _:
+                raise Exception(f'Node of type "{node.type} is not supported!"')
+        return ret
 
     def eval(self, ctx, si, wo, active):
         return 0.0
