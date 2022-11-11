@@ -3,6 +3,7 @@ import bpy
 import matplotlib.pyplot as plt
 import mitsuba as mi
 import drjit as dr
+import numpy as np
 
 mi.set_variant("cuda_ad_rgb")
 
@@ -61,13 +62,16 @@ class BlendBSDF(mi.BSDF):
             value = input.default_value
             match input.type:
                 case "RGBA":
-                    value = mi.Color3f(value[0], value[1], value[2])
+                    value = [
+                        mi.Float(value[0]),
+                        mi.Float(value[1]),
+                        mi.Float(value[2]),
+                        mi.Float(value[3]),
+                    ]
                     print(f"{value=}")
                     return value
                 case "VECTOR":
-                    match input.name:
-                        case "Normal":
-                            return si.n
+                    return None
                 case "VALUE":
                     value = mi.Float(value)
                     print(f"{value=}")
@@ -94,6 +98,8 @@ class BlendBSDF(mi.BSDF):
                 normal = self.sample_node_input(
                     node, "Normal", ctx, si, sample1, sample2, active
                 )
+                if normal is None:
+                    normal = si.n
                 print(f"{type(normal)=}")
                 print(f"{type(reflectance)=}")
                 cos_theta_i = dr.dot(normal, si.wi)
@@ -108,7 +114,7 @@ class BlendBSDF(mi.BSDF):
                 bs.sampled_type = mi.BSDFFlags.DiffuseReflection
                 bs.sampled_component = 0
 
-                ret = {node.outputs[0].name: (bs, mi.Color3f(reflectance))}
+                ret = {node.outputs[0].name: (bs, mi.Color3f(reflectance[:3]))}
             case "EMISSION":
                 color = self.sample_node_input(
                     node, "Color", ctx, si, sample1, sample2, active
@@ -133,7 +139,12 @@ class BlendBSDF(mi.BSDF):
                 ret = {node.outputs[0].name: value}
             case "RGB":
                 value = node.outputs[0].default_value
-                value = mi.Color3f(value[0], value[1], value[2])
+                value = [
+                    mi.Float(value[0]),
+                    mi.Float(value[1]),
+                    mi.Float(value[2]),
+                    mi.Float(0.0),
+                ]
                 print(f"{value=}")
                 ret = {node.outputs[0].name: value}
             case "CAMERA":
@@ -150,6 +161,8 @@ class BlendBSDF(mi.BSDF):
                 normal = self.sample_node_input(
                     node, "Normal", ctx, si, sample1, sample2, active
                 )
+                if normal is None:
+                    normal = si.n
                 cos_theta_i = dr.dot(normal, si.wi)
 
                 fac = mi.fresnel(cos_theta_i, ior)
@@ -184,6 +197,24 @@ class BlendBSDF(mi.BSDF):
                     node.outputs[2].name: uv,
                     node.outputs[6].name: reflection,
                 }
+            case "TEX_IMAGE":
+                print(f"{node.image.filepath=}")
+                width, height = node.image.size
+                pixels = np.array(node.image.pixels)
+                # pixels = pixels.reshape((width, height, 4))
+                # bm = mi.Bitmap(np.array(node.image.pixels)[..., :3])
+                tensor = mi.TensorXf(pixels, shape=[height, width, 4])
+                tex = mi.Texture2f(tensor)
+
+                vector = self.sample_node_input(
+                    node, "Vector", ctx, si, sample1, sample2, active
+                )
+                if vector is None:
+                    vector = mi.Point3f(si.uv.x, si.uv.y, 0.0)
+
+                color = tex.eval(mi.Point2f(vector.x, vector.y), active)
+
+                ret = {node.outputs[0].name: color}
             case _:
                 raise Exception(f'Node of type "{node.type} is not supported!"')
         return ret
