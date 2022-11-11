@@ -210,16 +210,34 @@ class BlendBSDF(mi.BSDF):
                 if vector is None:
                     vector = mi.Point3f(si.uv.x, si.uv.y, 0.0)
 
+                match node.extension:
+                    case "Repeat":
+                        wrap_mode = dr.WrapMode.Repeat
+                    case "Extend":
+                        wrap_mode = dr.WrapMode.Clamp
+                    case "Clip":
+                        wrap_mode = dr.WrapMode.Mirror
+                    case _:
+                        raise Exception(f'Extension "{node.extension}" not supported!')
+
                 match node.interpolation:
                     case "Linear":
-                        tex = mi.Texture2f(tensor, filter_mode=dr.FilterMode.Linear)
+                        tex = mi.Texture2f(
+                            tensor,
+                            filter_mode=dr.FilterMode.Linear,
+                            wrap_mode=wrap_mode,
+                        )
                         color = tex.eval(mi.Point2f(vector.x, vector.y), active)
                     case "Closest":
-                        tex = mi.Texture2f(tensor, filter_mode=dr.FilterMode.Nearest)
+                        tex = mi.Texture2f(
+                            tensor,
+                            filter_mode=dr.FilterMode.Nearest,
+                            wrap_mode=wrap_mode,
+                        )
                         print(f"{tex.filter_mode()=}")
                         color = tex.eval_cubic(mi.Point2f(vector.x, vector.y), active)
                     case "Cubic":
-                        tex = mi.Texture2f(tensor)
+                        tex = mi.Texture2f(tensor, wrap_mode=wrap_mode)
                         color = tex.eval_cubic(mi.Point2f(vector.x, vector.y), active)
                     case _:
                         raise Exception(
