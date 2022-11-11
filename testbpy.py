@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import mitsuba as mi
 import drjit as dr
 
-mi.set_variant("llvm_ad_rgb")
+mi.set_variant("cuda_ad_rgb")
 
 bpy.ops.wm.open_mainfile(filepath="untitled.blend")
 
@@ -142,6 +142,20 @@ class BlendBSDF(mi.BSDF):
                 normal = si.n
                 tangent = si.to_world(mi.Vector3f(1.0, 0.0, 0.0))
                 true_normal = si.n
+                incoming = si.wi
+                parametric = si.dp_dv
+                backfacing = dr.select(
+                    dr.dot(si.to_local(si.n), si.wi) < 0, mi.Float(1.0), mi.Float(0.0)
+                )
+                ret = {
+                    node.outputs[0].name: position,
+                    node.outputs[1].name: normal,
+                    node.outputs[2].name: tangent,
+                    node.outputs[3].name: true_normal,
+                    node.outputs[4].name: incoming,
+                    node.outputs[5].name: parametric,
+                    node.outputs[6].name: backfacing,
+                }
             case _:
                 raise Exception(f'Node of type "{node.type} is not supported!"')
         return ret
@@ -154,6 +168,9 @@ class BlendBSDF(mi.BSDF):
 
     def eval_pdf(self, ctx, si, wo, active):
         return 0.0, 0.0
+
+    def to_string(self):
+        return f'BlendBSDF[\n\tmaterial_id = "{self.material_id}"\n]'
 
 
 mi.register_bsdf("blend_bsdf", lambda props: BlendBSDF(props))
@@ -169,10 +186,11 @@ for ob in bpy.data.objects:
         )
 
 scene = mi.cornell_box()
-scene["small-box"]["bsdf"] = bsdfs["Material"]
+scene["large-box"]["bsdf"] = bsdfs["Material"]
+print(f"{scene=}")
 scene = mi.load_dict(scene)
 
 with dr.suspend_grad():
-    img = mi.render(scene, spp=1)
+    img = mi.render(scene)
 plt.imshow(mi.util.convert_to_bitmap(img))
 plt.show()
