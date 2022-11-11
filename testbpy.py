@@ -44,20 +44,21 @@ class BlendBSDF(mi.BSDF):
         active: bool = True,
     ) -> Any:
         input = node.inputs[input]
+        print(f"{input.type=}")
         links = input.links
         if links is not None and len(links) == 1:
             link = links[0]
             input_node: bpy.type.Node = link.from_node
-            return self.sample_node(input_node, ctx, si, sample1, sample2, active)
+            value = self.sample_node(input_node, ctx, si, sample1, sample2, active)
+            print(f"{type(value)=}")
+            return value
         else:
             print(f"{input.type=}")
-            print(f"{len(input.default_value)=}")
+            # print(f"{len(input.default_value)=}")
             value = input.default_value
             match input.type:
                 case "RGBA":
-                    value = mi.load_dict(
-                        {"type": "rgb", "value": [value[0], value[1], value[2]]}
-                    )
+                    value = mi.Color3f(value[0], value[1], value[2])
                     print(f"{value=}")
                     return value
 
@@ -88,9 +89,10 @@ class BlendBSDF(mi.BSDF):
                 bs.sampled_type = mi.BSDFFlags.DiffuseReflection
                 bs.sampled_component = 0
 
-                value = reflectance.eval(si, active)
-
-                return (bs, value)
+                return (bs, mi.Color3f(reflectance))
+            case "VALUE":
+                value = node.outputs[0].default_value
+                return mi.Float(value)
 
     def eval(self, ctx, si, wo, active):
         return 0.0
@@ -119,6 +121,6 @@ scene["small-box"]["bsdf"] = bsdfs["Material"]
 scene = mi.load_dict(scene)
 
 with dr.suspend_grad():
-    img = mi.render(scene)
+    img = mi.render(scene, spp=1)
 plt.imshow(mi.util.convert_to_bitmap(img))
 plt.show()
