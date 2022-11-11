@@ -109,6 +109,23 @@ class BlendBSDF(mi.BSDF):
                 bs.sampled_component = 0
 
                 ret = {node.outputs[0].name: (bs, mi.Color3f(reflectance))}
+            case "EMISSION":
+                color = self.sample_node_input(
+                    node, "Color", ctx, si, sample1, sample2, active
+                )
+                strength = self.sample_node_input(
+                    node, "Strength", ctx, si, sample1, sample2, active
+                )
+
+                bs: mi.BSDFSample3f = dr.zeros(mi.BSDFSample3f)
+
+                bs.wo = mi.warp.square_to_uniform_sphere(sample2)
+                bs.wo = mi.warp.square_to_uniform_sphere_pdf(bs.wo)
+                bs.eta = 1.0
+                bs.sampled_type = mi.BSDFFlags.Empty
+                bs.sampled_component = 0
+
+                ret = {node.outputs[0].name: (bs, mi.Color3f(color * strength))}
             case "VALUE":
                 value = node.outputs[0].default_value
                 value = mi.Float(value)
