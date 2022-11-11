@@ -48,8 +48,11 @@ class BlendBSDF(mi.BSDF):
         links = input.links
         if links is not None and len(links) == 1:
             link = links[0]
+            name = link.from_socket.name
             input_node: bpy.type.Node = link.from_node
-            value = self.sample_node(input_node, ctx, si, sample1, sample2, active)
+            value = self.sample_node(input_node, ctx, si, sample1, sample2, active)[
+                name
+            ]
             print(f"{type(value)=}")
             return value
         else:
@@ -89,10 +92,24 @@ class BlendBSDF(mi.BSDF):
                 bs.sampled_type = mi.BSDFFlags.DiffuseReflection
                 bs.sampled_component = 0
 
-                return (bs, mi.Color3f(reflectance))
+                return {node.outputs[0].name: (bs, mi.Color3f(reflectance))}
             case "VALUE":
                 value = node.outputs[0].default_value
-                return mi.Float(value)
+                value = mi.Float(value)
+                print(f"{value=}")
+                return {node.outputs[0].name: value}
+            case "RGB":
+                value = node.outputs[0].default_value
+                value = mi.Color3f(value[0], value[1], value[2])
+                print(f"{value=}")
+                return {node.outputs[0].name: value}
+            case "CAMERA":
+                view_vector = si.wi
+                view_distance = si.t
+                return {
+                    node.outputs[0].name: view_vector,
+                    node.outputs[2].name: view_distance,
+                }
 
     def eval(self, ctx, si, wo, active):
         return 0.0
