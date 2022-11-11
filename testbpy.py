@@ -211,12 +211,12 @@ class BlendBSDF(mi.BSDF):
                     vector = mi.Point3f(si.uv.x, si.uv.y, 0.0)
 
                 match node.extension:
-                    case "Repeat":
+                    case "REPEAT":
                         wrap_mode = dr.WrapMode.Repeat
-                    case "Extend":
-                        wrap_mode = dr.WrapMode.Clamp
-                    case "Clip":
+                    case "EXTEND":
                         wrap_mode = dr.WrapMode.Mirror
+                    case "CLIP":
+                        wrap_mode = dr.WrapMode.Clamp
                     case _:
                         raise Exception(f'Extension "{node.extension}" not supported!')
 
